@@ -28,5 +28,5 @@ public interface LemmaRepository extends JpaRepository<Lemma, Integer> {
     List<Lemma> findAllByLemmaAndSiteId(String lemma, int siteId);
 
     @Query(value = "select count(l.id) from Lemma l")
-    Integer getCount();
+    Integer getCountId();
 }

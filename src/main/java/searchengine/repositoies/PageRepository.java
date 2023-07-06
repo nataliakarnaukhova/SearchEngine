@@ -19,5 +19,5 @@ public interface PageRepository extends JpaRepository<Page, Integer> {
     Optional<Page> findByPathAndSiteId(String path, int siteId);
 
     @Query(value = "select count(p.id) from Page p where p.site.id = :siteId")
-    Integer pageCount(int siteId);
+    Integer getCountId(int siteId);
 }

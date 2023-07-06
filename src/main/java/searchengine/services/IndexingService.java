@@ -8,7 +8,6 @@ import searchengine.dto.response.ErrorResponse;
 import searchengine.dto.response.Response;
 import searchengine.dto.response.SuccessResponse;
 import searchengine.models.Site;
-import searchengine.utils.RepositoryUtils;
 import searchengine.task.TaskBuilder;
 
 import java.util.List;
@@ -22,7 +21,7 @@ public class IndexingService {
     public static volatile boolean isIndexingNow;
     private final Logger log = Logger.getLogger(IndexingService.class);
     private final SitesListConfig sitesFromConfig;
-    private final RepositoryUtils repositoryUtils;
+    private final RepositoryService repositoryService;
 
     public Response startIndexing() {
         if (isIndexingNow) {
@@ -31,7 +30,7 @@ public class IndexingService {
         }
 
         IndexingService.isIndexingNow = true;
-        repositoryUtils.cleanRepositories();
+        repositoryService.cleanAllRepositories();
 
         List<Site> siteList = sitesFromConfig.getSites()
                 .stream()
@@ -40,9 +39,10 @@ public class IndexingService {
                     site.setUrl(item.getUrl());
                     site.setName(item.getName());
                     return site;
-                }).toList();
+                })
+                .toList();
 
-        new Thread(() -> TaskBuilder.makeIndexingAllSiteTask(siteList, repositoryUtils)).start();
+        new Thread(() -> TaskBuilder.makeTaskIndexingAllSite(siteList, repositoryService)).start();
 
         return new SuccessResponse();
     }
@@ -56,7 +56,7 @@ public class IndexingService {
         ForkJoinPool.commonPool().shutdownNow();
         isIndexingNow = false;
 
-        repositoryUtils.stopIndexing();
+        repositoryService.stopIndexing();
 
         return new SuccessResponse();
     }
@@ -70,16 +70,16 @@ public class IndexingService {
                 .map(siteConfig -> siteConfig.getUrl().replaceAll(regex, ""))
                 .collect(Collectors.toSet());
 
-        boolean isCorrectPage = sitesSet.contains(destSite);
+        boolean isSitePresentInConfig = sitesSet.contains(destSite);
 
-        if (!isCorrectPage) {
+        if (!isSitePresentInConfig) {
             log.error("Сайт '" + url + "' находится за пределами сайтов, указанных в конфигурационном файле");
-            return new ErrorResponse("Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
+            return new ErrorResponse("Данная страница не указана в списке конфигурационном файле.");
         }
 
         if (isIndexingNow) {
-            log.error("Ошибка при запуске индексации. Индексация страницы уже запущена");
-            return new ErrorResponse("Индексация уже запущена");
+            log.error("Ошибка при запуске индексации. Индексация страниц уже запущена");
+            return new ErrorResponse("Ошибка при запуске индексации. Индексация страниц уже запущена");
         }
 
         isIndexingNow = true;
@@ -94,7 +94,8 @@ public class IndexingService {
                 });
 
         log.info("Сайт '" + site.getUrl() + "' добавлен в очередь на индексацию");
-        new Thread(() -> TaskBuilder.makeIndexingOneSiteTask(site, repositoryUtils)).start();
+
+        new Thread(() -> TaskBuilder.makeTaskIndexingOneSite(site, repositoryService)).start();
 
         return new SuccessResponse();
     }

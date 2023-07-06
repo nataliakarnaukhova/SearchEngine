@@ -9,7 +9,6 @@ import searchengine.dto.statistics.DetailedStatistics;
 import searchengine.dto.statistics.StatisticsDto;
 import searchengine.dto.statistics.TotalStatisticsDto;
 import searchengine.models.Site;
-import searchengine.enums.Status;
 import searchengine.repositoies.LemmaRepository;
 import searchengine.repositoies.PageRepository;
 import searchengine.repositoies.SiteRepository;
@@ -27,28 +26,28 @@ public class StatisticsService {
     private final SitesListConfig sitesFromConfig;
 
     public Response getStatistics() {
-        TotalStatisticsDto total = new TotalStatisticsDto();
+        TotalStatisticsDto totalStatistic = new TotalStatisticsDto();
         List<Site> foundSites = siteRepository.findAll();
-        total.setSites(foundSites.size());
-        total.setIndexing(true);
+        totalStatistic.setSites(foundSites.size());
+        totalStatistic.setIndexing(true);
 
         List<DetailedStatistics> detailed;
 
-        if (siteRepository.findAll().isEmpty()) {
-            detailed = getInitialPage(total);
+        if (foundSites.isEmpty()) {
+            detailed = getEmptyStatistic(totalStatistic);
         } else {
-            detailed = getUpdatedPage(total, foundSites);
+            detailed = getStatisticsFromMemory(totalStatistic, foundSites);
         }
 
         StatisticsDto statisticsDto = StatisticsDto.builder()
-                .total(total)
+                .total(totalStatistic)
                 .detailed(detailed)
                 .build();
 
         return new StatisticsResponse(statisticsDto);
     }
 
-    private List<DetailedStatistics> getInitialPage(TotalStatisticsDto total) {
+    private List<DetailedStatistics> getEmptyStatistic(TotalStatisticsDto total) {
         List<DetailedStatistics> detailed = new ArrayList<>();
 
         sitesFromConfig.getSites().forEach(site -> {
@@ -57,7 +56,7 @@ public class StatisticsService {
                     .url(site.getUrl())
                     .pages(0)
                     .lemmas(0)
-                    .status(Status.UNINDEXED.name())
+                    .status(null)
                     .error("Сайт не проиндексирован")
                     .statusTime(new Date().getTime())
                     .build();
@@ -71,15 +70,15 @@ public class StatisticsService {
         return detailed;
     }
 
-    private List<DetailedStatistics> getUpdatedPage(TotalStatisticsDto total, List<Site> sites) {
-        List<DetailedStatistics> detailed = new ArrayList<>();
+    private List<DetailedStatistics> getStatisticsFromMemory(TotalStatisticsDto total, List<Site> sites) {
+        List<DetailedStatistics> detailedStatistics = new ArrayList<>();
 
         sites.forEach(site -> {
             DetailedStatistics itemSite = new DetailedStatistics();
             itemSite.setName(site.getName());
             itemSite.setUrl(site.getUrl());
 
-            int pages = pageRepository.pageCount(site.getId());
+            int pages = pageRepository.getCountId(site.getId());
             itemSite.setPages(pages);
 
             int lemmas = lemmaRepository.getCountBySiteId(site.getId());
@@ -96,9 +95,9 @@ public class StatisticsService {
             itemSite.setStatusTime(site.getStatusTime().getTime());
             total.setPages(total.getPages() + pages);
             total.setLemmas(total.getLemmas() + lemmas);
-            detailed.add(itemSite);
+            detailedStatistics.add(itemSite);
         });
 
-        return detailed;
+        return detailedStatistics;
     }
 }

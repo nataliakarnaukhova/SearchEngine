@@ -1,11 +1,12 @@
 package searchengine.task;
 
 import org.apache.log4j.Logger;
-import searchengine.models.Site;
 import searchengine.enums.Status;
+import searchengine.models.Site;
 import searchengine.services.IndexingService;
-import searchengine.utils.RepositoryUtils;
+import searchengine.services.RepositoryService;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ForkJoinPool;
@@ -13,27 +14,27 @@ import java.util.concurrent.ForkJoinPool;
 public class TaskBuilder {
     private static final Logger log = Logger.getLogger(IndexingService.class);
 
-    public static void makeIndexingOneSiteTask(Site site, RepositoryUtils repositoryUtils) {
-        repositoryUtils.oneSiteIndexingPrepare(site);
-        repositoryUtils.addNewSiteToDB(site);
+    public static void makeTaskIndexingOneSite(Site site, RepositoryService repositoryService) {
+        repositoryService.cleanDataSiteForIndexing(site);
+        repositoryService.saveNewSite(site);
 
-        IndexingRecursiveTask task = makeTask(site, repositoryUtils);
+        IndexingRecursiveTask task = makeTask(site, repositoryService);
         new ForkJoinPool().invoke(task);
 
-        setSiteIndexed(site, repositoryUtils);
+        setSiteIndexed(site, repositoryService);
         IndexingService.isIndexingNow = false;
 
         log.info("Индексация сайта " + site.getUrl() + " завершена");
     }
 
-    public static synchronized void makeIndexingAllSiteTask(List<Site> siteList, RepositoryUtils repositoryUtils) {
-        siteList.forEach(repositoryUtils::addNewSiteToDB);
+    public static synchronized void makeTaskIndexingAllSite(List<Site> siteList, RepositoryService repositoryService) {
+        siteList.forEach(repositoryService::saveNewSite);
         siteList.forEach(site -> {
-            IndexingRecursiveTask task = makeTask(site, repositoryUtils);
+            IndexingRecursiveTask task = makeTask(site, repositoryService);
             new ForkJoinPool().invoke(task);
-            setSiteIndexed(site, repositoryUtils);
+            setSiteIndexed(site, repositoryService);
 
-            List<Site> notIndexedSiteList = repositoryUtils.getSiteRepository()
+            List<Site> notIndexedSiteList = repositoryService.getSiteRepository()
                     .findAll()
                     .stream()
                     .filter(siteDB -> siteDB.getStatus().equals(Status.INDEXING))
@@ -47,16 +48,18 @@ public class TaskBuilder {
 
     }
 
-    private static synchronized IndexingRecursiveTask makeTask(Site site, RepositoryUtils repositoryUtils) {
+    private static synchronized IndexingRecursiveTask makeTask(Site site, RepositoryService repositoryService) {
         log.info("Индексация страницы " + site.getUrl());
-        return new IndexingRecursiveTask(site.getUrl(), site, repositoryUtils);
+        return new IndexingRecursiveTask(repositoryService, site.getUrl(), site);
     }
 
-    private static synchronized void setSiteIndexed(Site site, RepositoryUtils repositoryUtils) {
-        Optional<Site> optionalSite = repositoryUtils.getSite(site.getUrl());
+    private static synchronized void setSiteIndexed(Site site, RepositoryService repositoryService) {
+        Optional<Site> optionalSite = repositoryService.getSite(site.getUrl());
         optionalSite.ifPresent(existSite -> {
             if (!existSite.getStatus().equals(Status.FAILED)) {
-                repositoryUtils.setIndexedSite(existSite);
+                existSite.setStatus(Status.INDEXED);
+                existSite.setStatusTime(new Date());
+                repositoryService.saveSite(existSite);
             }
         });
     }

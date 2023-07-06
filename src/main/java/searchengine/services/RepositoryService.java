@@ -1,4 +1,4 @@
-package searchengine.utils;
+package searchengine.services;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -6,7 +6,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.enums.Status;
-import searchengine.models.*;
+import searchengine.models.Lemma;
+import searchengine.models.Page;
+import searchengine.models.SearchIndex;
+import searchengine.models.Site;
 import searchengine.repositoies.LemmaRepository;
 import searchengine.repositoies.PageRepository;
 import searchengine.repositoies.SearchIndexRepository;
@@ -17,14 +20,14 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 @Getter
-public class RepositoryUtils {
+public class RepositoryService {
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
     private final LemmaRepository lemmaRepository;
     private final SearchIndexRepository searchIndexRepository;
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void cleanRepositories() {
+    public void cleanAllRepositories() {
         siteRepository.deleteAll();
         pageRepository.deleteAll();
         lemmaRepository.deleteAll();
@@ -44,7 +47,7 @@ public class RepositoryUtils {
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void oneSiteIndexingPrepare(Site site) {
+    public void cleanDataSiteForIndexing(Site site) {
         Optional<Site> optionalSite = siteRepository.findByUrl(site.getUrl());
         optionalSite.ifPresent(alreadyExistSite -> {
             List<Page> alreadyExistPageList = pageRepository.findAllBySite(alreadyExistSite);
@@ -52,12 +55,12 @@ public class RepositoryUtils {
             siteRepository.deleteById(alreadyExistSite.getId());
             pageRepository.deleteAllBySite(alreadyExistSite);
             lemmaRepository.deleteAllBySite(alreadyExistSite);
-            deleteSearchIndex(alreadyExistPageList);
+            alreadyExistPageList.forEach(page -> searchIndexRepository.deleteByPageId(page.getId()));
         });
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void addNewSiteToDB(Site site) {
+    public void saveNewSite(Site site) {
         site.setStatus(Status.INDEXING);
         site.setStatusTime(new Date());
         site.setName(site.getName());
@@ -66,7 +69,7 @@ public class RepositoryUtils {
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void setIndexingLastError(Site site, int statusCode, String message) {
+    public void saveSiteWithLastErrorIndexing(Site site, int statusCode, String message) {
         Optional<Site> optionalSite = siteRepository.findByUrl(site.getUrl());
         if(optionalSite.isPresent()) {
             site.setLastError("Ошибка подключения. Код ошибки - " + statusCode + " Причина: " + message);
@@ -76,18 +79,13 @@ public class RepositoryUtils {
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void addPageToDB(Page page) {
+    public void savePage(Page page) {
         pageRepository.saveAndFlush(page);
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void deleteSearchIndex(List<Page> pageList) {
-        pageList.forEach(page -> searchIndexRepository.deleteSelectedContains(page.getId()));
-    }
-
-    @Transactional(isolation = Isolation.SERIALIZABLE)
-    public synchronized Map<Page, Set<Lemma>> addLemmaToDBAndReturnData(Page page) {
-        Map<String, Integer> lemmas = Collections.synchronizedMap(new HashMap<>(LemmaUtils.makeLemmas(page)));
+    public synchronized Map<Page, Set<Lemma>> saveLemma(Page page) {
+        Map<String, Integer> lemmas = Collections.synchronizedMap(LemmaService.getLemmas(page));
         Set<Lemma> lemmaSet = Collections.synchronizedSet(new HashSet<>());
 
         lemmas.forEach((word, count) -> {
@@ -117,25 +115,17 @@ public class RepositoryUtils {
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void setIndexedSite(Site site) {
-        site.setStatus(Status.INDEXED);
-        site.setStatusTime(new Date());
+    public void saveSite(Site site) {
         siteRepository.saveAndFlush(site);
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void setFailedSite(Site site) {
-        site.setStatus(Status.FAILED);
-        site.setStatusTime(new Date());
-        siteRepository.saveAndFlush(site);
-    }
-
     public Optional<Site> getSite(String url) {
         return siteRepository.findByUrl(url);
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void addIndexToDB(Map<Page, Set<Lemma>> lemmaMap) {
+    public void saveIndex(Map<Page, Set<Lemma>> lemmaMap) {
         Set<SearchIndex> indexSet = Collections.synchronizedSet(new HashSet<>());
 
         lemmaMap.forEach((page, lemmaSet) -> lemmaSet.forEach(lemma -> {

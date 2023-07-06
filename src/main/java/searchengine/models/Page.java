@@ -28,7 +28,7 @@ public class Page implements Serializable {
     @Column(nullable = false)
     private Integer code;
 
-    @Column(columnDefinition = "MEDIUMTEXT", nullable = false)
+    @Column(columnDefinition = "MEDIUMTEXT")
     private String context;
 
     @Transient

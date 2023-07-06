@@ -17,7 +17,7 @@ public class ApiController {
     private final SearchingService searchingService;
 
     @GetMapping("/statistics")
-    public ResponseEntity<Response> getStatistic() {
+    public ResponseEntity<Response> getStatistics() {
         return ResponseEntity.ok(statisticsService.getStatistics());
     }
 
@@ -43,6 +43,6 @@ public class ApiController {
                                                    required = false, defaultValue = "0") Integer offset,
                                            @RequestParam(name = "limit",
                                                    required = false, defaultValue = "20") Integer limit) {
-        return ResponseEntity.ok(searchingService.searching(query, url, offset, limit));
+        return ResponseEntity.ok(searchingService.searchText(query, url, offset, limit));
     }
 }

@@ -1,4 +1,4 @@
-package searchengine.utils;
+package searchengine.services;
 
 import lombok.AllArgsConstructor;
 import org.jsoup.Connection;
@@ -12,9 +12,9 @@ import java.util.HashMap;
 import java.util.Optional;
 
 @AllArgsConstructor
-public class PageUtils {
+public class PageService {
     public static synchronized Optional<Page> getPage(Connection.Response response, HashMap<Site, String> siteMap,
-                                                      RepositoryUtils repositoryUtils) throws IOException {
+                                                      RepositoryService repositoryService) throws IOException {
         Optional<Site> site = siteMap.keySet().stream().findFirst();
         Optional<String> url = siteMap.values().stream().findFirst();
 
@@ -23,7 +23,7 @@ public class PageUtils {
         }
         String path = makePath(site.get(), url.get());
 
-        if (checkForAlreadyExistPath(path, repositoryUtils, site.get().getUrl())) {
+        if (checkForAlreadyExistPath(path, repositoryService, site.get().getUrl())) {
             return Optional.empty();
         }
 
@@ -51,9 +51,9 @@ public class PageUtils {
                 url.replaceAll(site.getUrl(), "");
     }
 
-    private static synchronized boolean checkForAlreadyExistPath(String path, RepositoryUtils repositoryUtils, String url) {
-        SiteRepository siteRepository = repositoryUtils.getSiteRepository();
-        PageRepository pageRepository = repositoryUtils.getPageRepository();
+    private static synchronized boolean checkForAlreadyExistPath(String path, RepositoryService repositoryService, String url) {
+        SiteRepository siteRepository = repositoryService.getSiteRepository();
+        PageRepository pageRepository = repositoryService.getPageRepository();
 
         Optional<Site> site = siteRepository.findByUrl(url);
         if (site.isEmpty()) {
@@ -62,5 +62,4 @@ public class PageUtils {
 
         return pageRepository.findByPathAndSiteId(path, site.get().getId()).isPresent();
     }
-
 }

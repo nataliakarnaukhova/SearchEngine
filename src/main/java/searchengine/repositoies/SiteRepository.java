@@ -12,5 +12,5 @@ public interface SiteRepository extends JpaRepository<Site, Integer> {
     Optional<Site> findByUrl(String url);
 
     @Query(value = "select count(s.id) from Site s")
-    Integer findCount();
+    Integer getCountId();
 }
